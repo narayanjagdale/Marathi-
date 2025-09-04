@@ -1,0 +1,89 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="mr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>मराठी शैक्षणिक ॲप</title>
+<style>
+  :root{--bg:#f8fafc;--btnBg:#fff;--btnBorder:#000;--good:#16a34a;--bad:#dc2626;}
+  body{margin:0;font-family:"Noto Sans Devanagari","Arial",sans-serif;background:var(--bg);color:#000;-webkit-font-smoothing:antialiased}
+  h1{font-size:36px;margin:16px 0;font-weight:900;text-align:center}
+  .screen{display:none;padding:20px;max-width:1100px;margin:0 auto}
+  .active{display:block}
+  .btn{display:block;width:100%;max-width:560px;margin:14px auto;padding:20px;font-size:26px;font-weight:800;border-radius:14px;border:3px solid var(--btnBorder);background:var(--btnBg);cursor:pointer}
+  .btn:hover{background:#000;color:#fff}
+  .controls{display:flex;gap:10px;justify-content:center;align-items:center;margin-top:12px}
+  .homeBtn,.listenBtn{padding:10px 16px;border-radius:10px;border:2px solid #000;background:#fff;cursor:pointer;font-weight:800}
+  .emojiBig{font-size:100px;margin:12px 0;text-align:center}
+  .question{font-size:22px;margin:10px 0;text-align:center}
+  .choices{display:grid;gap:12px;margin:14px auto}
+  @media(min-width:920px){.choices{grid-template-columns:repeat(4,1fr)}}
+  @media(min-width:640px) and (max-width:919px){.choices{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:639px){.choices{grid-template-columns:repeat(2,1fr)}}
+  .choiceBtn{background:#fff;border:3px solid #000;border-radius:12px;padding:18px;font-size:26px;font-weight:900;cursor:pointer;min-height:96px}
+  .lettersGrid{display:grid;gap:12px;margin:14px auto}
+  @media(min-width:920px){.lettersGrid{grid-template-columns:repeat(8,1fr)}}
+  @media(min-width:640px) and (max-width:919px){.lettersGrid{grid-template-columns:repeat(6,1fr)}}
+  @media(max-width:639px){.lettersGrid{grid-template-columns:repeat(4,1fr)}}
+  .tile{background:#fff;border:3px solid #000;border-radius:12px;padding:14px;font-size:28px;font-weight:900;cursor:pointer;text-align:center}
+  .output{display:inline-block;padding:10px 18px;border:3px solid #000;background:#fff;font-size:40px;font-weight:900;margin:10px auto;color:#000;border-radius:12px}
+  .feedback{text-align:center;font-size:26px;font-weight:800;margin-top:10px;height:40px}
+</style>
+</head>
+<body>
+
+<!-- मेनू स्क्रीन -->
+<div id="menu" class="screen active">
+  <h1>मराठी शैक्षणिक गेम</h1>
+  <button class="btn" onclick="startMode('emoji')">🎨 आवाज → इमोजी</button>
+  <button class="btn" onclick="startMode('word')">🔊 आवाज → शब्द</button>
+  <button class="btn" onclick="startMode('letters')">🔤 मुळाक्षरे ऐका</button>
+  <button class="btn" onclick="startMode('build')">✍️ अक्षरांनी शब्द तयार करा</button>
+  <button class="btn" onclick="startMode('match')">📝 मुळाक्षर → शब्द</button>
+</div>
+
+<!-- गेम स्क्रीन -->
+<div id="game" class="screen">
+  <div class="controls">
+    <button class="listenBtn" id="replayBtn">🔊 पुन्हा ऐका</button>
+    <button class="homeBtn" onclick="goHome()">🏠 मेनू</button>
+  </div>
+  <h1 id="modeTitle"></h1>
+  <div id="gameArea"></div>
+  <div id="feedback" class="feedback"></div>
+</div>
+
+<script>
+/* -------- डेटा -------- */
+const WORDS = ['कप','घर','ऊस','ओठ','आई','नथ','ढग','वड','यज्ञ','एक','छत','फणस','मगर','बदक','उखळ','शहर','भजन','अक्षर','चटई','गवत','औषध','ऐरण'];
+const emojiMap = {'कप':'🥤','घर':'🏡','ऊस':'🌾','ओठ':'👄','आई':'👩','नथ':'💍','ढग':'☁️','वड':'🌳','यज्ञ':'🪔','एक':'1️⃣','छत':'🏠','फणस':'🍈','मगर':'🐊','बदक':'🦆','उखळ':'⚱️','शहर':'🏙️','भजन':'🎶','अक्षर':'🔤','चटई':'🧺','गवत':'🌿','औषध':'💊','ऐरण':'⚒️'};
+const LETTERS48 = ['अ','आ','इ','ई','उ','ऊ','ए','ऐ','ओ','औ','अं','अः','क','ख','ग','घ','ङ','च','छ','ज','झ','ञ','ट','ठ','ड','ढ','ण','त','थ','द','ध','न','प','फ','ब','भ','म','य','र','ल','व','श','ष','स','ह','ळ','क्ष','त्र','ज्ञ'];
+
+let mode=''; let current={answer:null,letter:null};
+
+/* -------- TTS -------- */
+const TTS={voice:null,init(){const set=()=>{let v=speechSynthesis.getVoices();this.voice=v.find(x=>x.lang.startsWith('mr'))||v.find(x=>x.lang.startsWith('hi'))||v[0];};set();speechSynthesis.onvoiceschanged=set;},speak(t){speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang=this.voice?.lang||'mr-IN';u.voice=this.voice;speechSynthesis.speak(u);}};
+
+/* -------- UI helpers -------- */
+function goHome(){document.getElementById('menu').classList.add('active');document.getElementById('game').classList.remove('active');}
+function startMode(m){mode=m;document.getElementById('menu').classList.remove('active');document.getElementById('game').classList.add('active');nextQ();}
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a;}
+function sample(a,k=1){return shuffle(a.slice()).slice(0,k);}
+function feedback(txt,ok){let f=document.getElementById('feedback');f.textContent=txt;f.style.color=ok?'var(--good)':'var(--bad)';TTS.speak(txt);if(ok) setTimeout(nextQ,900);}
+
+/* -------- Modes -------- */
+function nextQ(){
+  let area=document.getElementById('gameArea');area.innerHTML='';document.getElementById('feedback').textContent='';
+  if(mode==='emoji'){let ans=sample(WORDS)[0];current.answer=ans;document.getElementById('modeTitle').textContent='🎨 आवाज → इमोजी';let opts=shuffle([ans,...sample(WORDS.filter(w=>w!==ans),3)]);let em=document.createElement('div');em.className='emojiBig';em.textContent=emojiMap[ans];area.appendChild(em);let ch=document.createElement('div');ch.className='choices';opts.forEach(w=>{let b=document.createElement('button');b.className='choiceBtn';b.innerHTML=`<div style="font-size:40px">${emojiMap[w]}</div><div>${w}</div>`;b.onclick=()=>feedback(w===ans?'✅ बरोबर!':'❌ चूक!',w===ans);ch.appendChild(b)});area.appendChild(ch);TTS.speak(ans);}
+  else if(mode==='word'){let ans=sample(WORDS)[0];current.answer=ans;document.getElementById('modeTitle').textContent='🔊 आवाज → शब्द';let opts=shuffle([ans,...sample(WORDS.filter(w=>w!==ans),3)]);let q=document.createElement('div');q.className='question';q.textContent='योग्य शब्द निवडा';area.appendChild(q);let ch=document.createElement('div');ch.className='choices';opts.forEach(w=>{let b=document.createElement('button');b.className='choiceBtn';b.textContent=w;b.onclick=()=>feedback(w===ans?'✅ बरोबर!':'❌ चूक!',w===ans);ch.appendChild(b)});area.appendChild(ch);TTS.speak(ans);}
+  else if(mode==='letters'){document.getElementById('modeTitle').textContent='🔤 मुळाक्षरे ऐका';let g=document.createElement('div');g.className='lettersGrid';LETTERS48.forEach(l=>{let b=document.createElement('button');b.className='tile';b.textContent=l;b.onclick=()=>TTS.speak(l);g.appendChild(b)});area.appendChild(g);}
+  else if(mode==='build'){let ans=sample(WORDS)[0];current.answer=ans;document.getElementById('modeTitle').textContent='✍️ शब्द तयार करा';let em=document.createElement('div');em.className='emojiBig';em.textContent=emojiMap[ans];area.appendChild(em);let out=document.createElement('div');out.className='output';area.appendChild(out);let pool=shuffle([...ans,...sample(LETTERS48,8)]);let g=document.createElement('div');g.className='lettersGrid';let built='';pool.forEach(l=>{let b=document.createElement('button');b.className='tile';b.textContent=l;b.onclick=()=>{built+=l;out.textContent=built;TTS.speak(l);if(ans.startsWith(built)){if(built===ans)feedback('✅ बरोबर!',true);}else{feedback('❌ चूक!',false);built='';out.textContent='';}};g.appendChild(b)});area.appendChild(g);TTS.speak(ans);}
+  else if(mode==='match'){let ans=sample(WORDS)[0];current.answer=ans;let letter=ans[0];document.getElementById('modeTitle').textContent='📝 मुळाक्षर → शब्द';let q=document.createElement('div');q.className='question';q.textContent=`"${letter}" ने सुरू होणारा शब्द निवडा`;area.appendChild(q);let opts=shuffle([ans,...sample(WORDS.filter(w=>w!==ans),3)]);let ch=document.createElement('div');ch.className='choices';opts.forEach(w=>{let b=document.createElement('button');b.className='choiceBtn';b.innerHTML=`<div style="font-size:40px">${emojiMap[w]}</div><div>${w}</div>`;b.onclick=()=>feedback(w===ans?'✅ बरोबर!':'❌ चूक!',w===ans);ch.appendChild(b)});area.appendChild(ch);TTS.speak(letter);}
+}
+
+/* -------- Init -------- */
+TTS.init();
+document.getElementById('replayBtn').onclick=()=>{if(current.answer)TTS.speak(current.answer);};
+</script>
+</body>
+</html>
